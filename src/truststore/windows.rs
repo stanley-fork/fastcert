@@ -14,7 +14,13 @@ use {
         HCERTSTORE, PKCS_7_ASN_ENCODING, X509_ASN_ENCODING,
     },
     windows::core::PCWSTR,
+    windows::Win32::Foundation::GetLastError,
 };
+
+#[cfg(target_os = "windows")]
+fn windows_error_string(error: windows::core::Error) -> String {
+    format!("Windows error 0x{:08X}: {}", error.code().0, error.message())
+}
 
 pub struct WindowsTrustStore {
     cert_path: String,
@@ -77,10 +83,16 @@ impl WindowsRootStore {
             let handle = CertOpenSystemStoreW(
                 None,
                 PCWSTR(store_name.as_ptr()),
-            )?;
+            ).map_err(|e| {
+                Error::TrustStore(format!("Failed to open Windows root store: {}", windows_error_string(e)))
+            })?;
 
             if handle.is_invalid() {
-                return Err(Error::TrustStore("Failed to open Windows root store".to_string()));
+                let error = GetLastError();
+                return Err(Error::TrustStore(format!(
+                    "Failed to open Windows root store: Invalid handle (error code: {:?})",
+                    error
+                )));
             }
 
             Ok(Self { handle })
@@ -121,10 +133,20 @@ impl WindowsRootStore {
                 cert_der,
                 CERT_STORE_ADD_REPLACE_EXISTING,
                 None,
-            )?;
+            ).map_err(|e| {
+                let err_msg = windows_error_string(e);
+                if err_msg.contains("0x80092003") || err_msg.contains("access") || err_msg.contains("denied") {
+                    Error::TrustStore(format!(
+                        "Access denied when adding certificate. Please run as administrator: {}",
+                        err_msg
+                    ))
+                } else {
+                    Error::TrustStore(format!("Failed to add certificate: {}", err_msg))
+                }
+            })?;
 
             if !result.as_bool() {
-                return Err(Error::TrustStore("Failed to add certificate to store".to_string()));
+                return Err(Error::TrustStore("Failed to add certificate to store: Operation returned failure".to_string()));
             }
 
             Ok(())
@@ -151,17 +173,27 @@ impl WindowsRootStore {
 
                 if stored_cert == cert_der {
                     // Duplicate the context so it doesn't stop enumeration when we delete it
-                    let dup_cert = CertDuplicateCertificateContext(Some(prev_cert))?;
+                    let dup_cert = CertDuplicateCertificateContext(Some(prev_cert))
+                        .map_err(|e| Error::TrustStore(format!(
+                            "Failed to duplicate certificate context: {}",
+                            windows_error_string(e)
+                        )))?;
 
                     if dup_cert.is_null() {
-                        return Err(Error::TrustStore("Failed to duplicate certificate context".to_string()));
+                        return Err(Error::TrustStore("Failed to duplicate certificate context: Null pointer returned".to_string()));
                     }
 
-                    let result = CertDeleteCertificateFromStore(dup_cert);
-
-                    if let Err(e) = result {
-                        return Err(Error::TrustStore(format!("Failed to delete certificate: {}", e)));
-                    }
+                    CertDeleteCertificateFromStore(dup_cert).map_err(|e| {
+                        let err_msg = windows_error_string(e);
+                        if err_msg.contains("0x80092003") || err_msg.contains("access") || err_msg.contains("denied") {
+                            Error::TrustStore(format!(
+                                "Access denied when deleting certificate. Please run as administrator: {}",
+                                err_msg
+                            ))
+                        } else {
+                            Error::TrustStore(format!("Failed to delete certificate: {}", err_msg))
+                        }
+                    })?;
 
                     deleted_any = true;
                 }
