@@ -363,7 +363,7 @@ pub fn generate_from_csr(
 /// Load CA certificate for signing (internal helper)
 fn load_ca_cert_for_signing(_cert_pem: &str, key_pem: &str) -> Result<rcgen::Certificate> {
     // Parse the PEM-encoded private key
-    let key_pair = KeyPair::from_pem(key_pem)
+    let _key_pair = KeyPair::from_pem(key_pem)
         .map_err(|e| Error::Certificate(format!("Failed to parse CA key: {}", e)))?;
 
     // Create CA certificate params with the loaded key

@@ -3,7 +3,6 @@
 use crate::{Error, Result};
 use super::TrustStore;
 use std::path::{Path, PathBuf};
-use std::env;
 use std::process::Command;
 
 pub struct NssTrustStore {
@@ -60,7 +59,7 @@ impl NssTrustStore {
     #[cfg(target_os = "windows")]
     fn get_firefox_profile_globs() -> Vec<String> {
         let mut globs = Vec::new();
-        if let Ok(profile) = env::var("USERPROFILE") {
+        if let Ok(profile) = std::env::var("USERPROFILE") {
             globs.push(format!("{}\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*", profile));
         }
         globs

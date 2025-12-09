@@ -4,7 +4,7 @@ use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::io::Write;
-use rcgen::{Certificate, CertificateParams, KeyPair, DistinguishedName, DnType, IsCa, BasicConstraints};
+use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, IsCa, BasicConstraints};
 use time::{OffsetDateTime, Duration};
 
 #[cfg(unix)]

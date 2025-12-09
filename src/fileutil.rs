@@ -1,7 +1,7 @@
 //! File and path utilities
 
 use crate::{Error, Result};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Get the CAROOT directory path
 pub fn get_ca_root() -> Result<PathBuf> {
