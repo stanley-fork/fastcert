@@ -1,7 +1,7 @@
 //! Certificate generation
 
 use crate::{Error, Result};
-use rcgen::{KeyPair, SanType, CertificateParams, KeyUsagePurpose, PKCS_RSA_SHA256, PKCS_ECDSA_P256_SHA256};
+use rcgen::{KeyPair, SanType, CertificateParams, KeyUsagePurpose, ExtendedKeyUsagePurpose, PKCS_RSA_SHA256, PKCS_ECDSA_P256_SHA256};
 use regex::Regex;
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -148,6 +148,13 @@ pub fn create_cert_params(hosts: &[String]) -> Result<CertificateParams> {
     ];
 
     Ok(params)
+}
+
+/// Add server authentication extended key usage
+pub fn add_server_auth(params: &mut CertificateParams) {
+    if !params.extended_key_usages.contains(&ExtendedKeyUsagePurpose::ServerAuth) {
+        params.extended_key_usages.push(ExtendedKeyUsagePurpose::ServerAuth);
+    }
 }
 
 #[cfg(test)]
