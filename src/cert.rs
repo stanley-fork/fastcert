@@ -182,6 +182,45 @@ pub fn key_to_pem(key: &KeyPair) -> Result<String> {
     Ok(pem::encode(&pem::Pem::new("PRIVATE KEY", key_der)))
 }
 
+/// Generate file names for certificate, key, and PKCS#12 files
+/// Matches fastcert behavior: example.com+4.pem, example.com+4-key.pem, example.com+4.p12
+pub fn generate_file_names(config: &CertificateConfig) -> (PathBuf, PathBuf, PathBuf) {
+    // Use provided file names if available
+    if let (Some(cert), Some(key), Some(p12)) = (&config.cert_file, &config.key_file, &config.p12_file) {
+        return (cert.clone(), key.clone(), p12.clone());
+    }
+
+    // Generate default name from first host
+    let default_name = if config.hosts.is_empty() {
+        "cert".to_string()
+    } else {
+        let mut name = config.hosts[0]
+            .replace(':', "_")
+            .replace('*', "_wildcard");
+
+        // Add count suffix if more than one host
+        if config.hosts.len() > 1 {
+            name.push_str(&format!("+{}", config.hosts.len() - 1));
+        }
+
+        // Add client suffix if client cert
+        if config.client_cert {
+            name.push_str("-client");
+        }
+
+        name
+    };
+
+    let cert_file = config.cert_file.clone()
+        .unwrap_or_else(|| PathBuf::from(format!("./{}.pem", default_name)));
+    let key_file = config.key_file.clone()
+        .unwrap_or_else(|| PathBuf::from(format!("./{}-key.pem", default_name)));
+    let p12_file = config.p12_file.clone()
+        .unwrap_or_else(|| PathBuf::from(format!("./{}.p12", default_name)));
+
+    (cert_file, key_file, p12_file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
