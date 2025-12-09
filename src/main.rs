@@ -47,6 +47,18 @@ struct Cli {
     #[arg(long = "CAROOT")]
     caroot: bool,
 
+    /// Customize the output certificate file path
+    #[arg(long = "cert-file", value_name = "FILE")]
+    cert_file: Option<String>,
+
+    /// Customize the output key file path
+    #[arg(long = "key-file", value_name = "FILE")]
+    key_file: Option<String>,
+
+    /// Customize the output PKCS#12 file path
+    #[arg(long = "p12-file", value_name = "FILE")]
+    p12_file: Option<String>,
+
     /// Domain names or IP addresses to generate certificates for
     #[arg(value_name = "DOMAINS")]
     domains: Vec<String>,
