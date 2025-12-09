@@ -68,4 +68,21 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(temp_dir);
     }
+
+    #[test]
+    fn test_ca_init() {
+        let temp_dir = std::env::temp_dir().join("rscert_test_init");
+
+        // Remove if exists
+        let _ = fs::remove_dir_all(&temp_dir);
+
+        let ca = CertificateAuthority::new(temp_dir.clone());
+        assert!(!temp_dir.exists());
+
+        ca.init().unwrap();
+        assert!(temp_dir.exists());
+
+        // Cleanup
+        fs::remove_dir_all(temp_dir).unwrap();
+    }
 }
