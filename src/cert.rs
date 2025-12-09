@@ -1,10 +1,11 @@
 //! Certificate generation
 
 use crate::{Error, Result};
-use rcgen::{KeyPair, SanType, PKCS_RSA_SHA256, PKCS_ECDSA_P256_SHA256};
+use rcgen::{KeyPair, SanType, CertificateParams, KeyUsagePurpose, PKCS_RSA_SHA256, PKCS_ECDSA_P256_SHA256};
 use regex::Regex;
 use std::net::IpAddr;
 use std::path::PathBuf;
+use time::{OffsetDateTime, Duration};
 
 pub struct CertificateConfig {
     pub hosts: Vec<String>,
@@ -121,6 +122,32 @@ fn check_wildcard_warning(name: &str) {
     if name.starts_with("*.") {
         eprintln!("Reminder: X.509 wildcards only go one level deep, so this won't match a.b.{}", &name[2..]);
     }
+}
+
+/// Create certificate parameters with proper validity period
+/// Certificates last for 2 years and 3 months, which is always less than 825 days,
+/// the limit that macOS/iOS apply to all certificates, including custom roots.
+/// See https://support.apple.com/en-us/HT210176
+pub fn create_cert_params(hosts: &[String]) -> Result<CertificateParams> {
+    let mut params = CertificateParams::default();
+
+    // Set validity period: 2 years and 3 months (always less than 825 days)
+    let now = OffsetDateTime::now_utc();
+    params.not_before = now;
+    // 2 years = 730 days, 3 months ≈ 90 days = 820 days total (< 825 days)
+    params.not_after = now + Duration::days(730 + 90);
+
+    // Build and set SANs
+    let san_list = build_san_list(hosts)?;
+    params.subject_alt_names = san_list;
+
+    // Set key usage for leaf certificates
+    params.key_usages = vec![
+        KeyUsagePurpose::DigitalSignature,
+        KeyUsagePurpose::KeyEncipherment,
+    ];
+
+    Ok(params)
 }
 
 #[cfg(test)]
