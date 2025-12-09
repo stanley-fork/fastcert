@@ -3,6 +3,7 @@ use rscert::Result;
 
 #[derive(Parser, Debug)]
 #[command(name = "rscert")]
+#[command(version)]
 #[command(about = "A simple zero-config tool to make locally-trusted development certificates", long_about = None)]
 struct Cli {
     /// Install the local CA in the system trust store
