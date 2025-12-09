@@ -199,6 +199,44 @@ impl TrustStore for JavaTrustStore {
     }
 
     fn uninstall(&self) -> Result<()> {
+        if !Self::has_keytool() {
+            // If keytool is not available, we can't uninstall but this is not an error
+            return Ok(());
+        }
+
+        let config = match Self::detect_java() {
+            Some(cfg) => cfg,
+            None => return Ok(()),
+        };
+
+        let cacerts_str = match config.cacerts_path.to_str() {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+
+        let args = vec![
+            "-delete",
+            "-alias", &self.unique_name,
+            "-keystore", cacerts_str,
+            "-storepass", "changeit",
+        ];
+
+        let output = Self::exec_keytool(&args)?;
+
+        // Check if certificate doesn't exist (not an error)
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("does not exist") {
+            return Ok(());
+        }
+
+        if !output.status.success() {
+            // Log but don't fail on uninstall errors
+            eprintln!(
+                "Warning: Failed to remove certificate from Java keystore: {}",
+                stderr
+            );
+        }
+
         Ok(())
     }
 }
