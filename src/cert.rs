@@ -93,7 +93,9 @@ pub fn build_san_list(hosts: &[String]) -> Result<Vec<SanType>> {
                 validate_hostname(&name)?;
                 san_list.push(SanType::DnsName(name));
             }
-            HostType::IpAddress(_) => {}
+            HostType::IpAddress(ip) => {
+                san_list.push(SanType::IpAddress(ip));
+            }
             HostType::Email(_) => {}
             HostType::Uri(_) => {}
         }
