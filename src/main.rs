@@ -63,6 +63,10 @@ struct Cli {
     #[arg(long)]
     client: bool,
 
+    /// Generate a certificate with an ECDSA key
+    #[arg(long)]
+    ecdsa: bool,
+
     /// Domain names or IP addresses to generate certificates for
     #[arg(value_name = "DOMAINS")]
     domains: Vec<String>,
