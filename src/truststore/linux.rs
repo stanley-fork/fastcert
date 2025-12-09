@@ -84,11 +84,38 @@ impl LinuxDistro {
     }
 }
 
-pub struct LinuxTrustStore;
+pub struct LinuxTrustStore {
+    cert_path: PathBuf,
+    distro: LinuxDistro,
+}
+
+impl LinuxTrustStore {
+    pub fn new(cert_path: &Path) -> Self {
+        Self {
+            cert_path: cert_path.to_path_buf(),
+            distro: LinuxDistro::detect(),
+        }
+    }
+
+    /// Get the system trust store path for the certificate
+    fn system_cert_path(&self) -> Option<PathBuf> {
+        self.distro.cert_path("rscert-rootCA")
+    }
+}
 
 impl TrustStore for LinuxTrustStore {
     fn check(&self) -> Result<bool> {
-        Ok(false)
+        // Check if the distribution is supported
+        if self.distro == LinuxDistro::Unknown {
+            return Ok(false);
+        }
+
+        // Check if the certificate file exists in the system trust store
+        if let Some(sys_path) = self.system_cert_path() {
+            Ok(sys_path.exists())
+        } else {
+            Ok(false)
+        }
     }
 
     fn install(&self) -> Result<()> {
