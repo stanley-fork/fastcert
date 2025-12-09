@@ -295,6 +295,83 @@ pub fn write_pkcs12_file(
     Ok(())
 }
 
+/// Generate and save a new certificate signed by the CA
+/// This is the main certificate generation function that orchestrates everything
+pub fn generate_certificate(
+    config: &CertificateConfig,
+    ca_cert: &rcgen::Certificate,
+) -> Result<()> {
+    if config.hosts.is_empty() {
+        return Err(Error::Certificate("No hosts specified".to_string()));
+    }
+
+    // Generate keypair for the certificate
+    let key_pair = generate_keypair(config.use_ecdsa)?;
+
+    // Create certificate parameters
+    let mut params = create_cert_params(&config.hosts)?;
+
+    // Set extended key usage based on certificate type
+    if config.client_cert {
+        add_client_auth(&mut params);
+    }
+
+    // Check if we have IP addresses, DNS names, or URIs for server auth
+    let has_server_names = config.hosts.iter().any(|h| {
+        let host_type = HostType::parse(h).ok();
+        matches!(host_type, Some(HostType::DnsName(_)) | Some(HostType::IpAddress(_)) | Some(HostType::Uri(_)))
+    });
+
+    if has_server_names {
+        add_server_auth(&mut params);
+    }
+
+    // Check if we have email addresses for email protection
+    let has_email = config.hosts.iter().any(|h| {
+        matches!(HostType::parse(h).ok(), Some(HostType::Email(_)))
+    });
+
+    if has_email {
+        add_email_protection(&mut params);
+    }
+
+    // If generating PKCS#12, set the CommonName to the first host (for IIS compatibility)
+    if config.pkcs12 {
+        params.distinguished_name.push(
+            rcgen::DnType::CommonName,
+            config.hosts[0].clone()
+        );
+    }
+
+    // Create the certificate with the CA as the issuer
+    let cert = rcgen::Certificate::from_params(params)
+        .map_err(|e| Error::Certificate(format!("Failed to create certificate: {}", e)))?;
+
+    // Serialize the certificate signed by CA
+    let cert_der = cert.serialize_der_with_signer(ca_cert)
+        .map_err(|e| Error::Certificate(format!("Failed to sign certificate: {}", e)))?;
+
+    // Get CA cert DER for PKCS#12
+    let ca_cert_der = ca_cert.serialize_der()
+        .map_err(|e| Error::Certificate(format!("Failed to serialize CA cert: {}", e)))?;
+
+    // Get file names
+    let (cert_file, key_file, p12_file) = generate_file_names(config);
+
+    // Write files based on mode
+    if !config.pkcs12 {
+        // PEM mode
+        let cert_pem = cert_to_pem(&cert_der);
+        let key_pem = key_to_pem(&key_pair)?;
+        write_pem_files(&cert_file, &key_file, &cert_pem, &key_pem)?;
+    } else {
+        // PKCS#12 mode
+        write_pkcs12_file(&p12_file, &cert_der, &key_pair, &ca_cert_der)?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
