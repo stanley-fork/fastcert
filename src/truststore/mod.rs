@@ -2,6 +2,27 @@
 
 use crate::Result;
 use std::path::Path;
+use std::env;
+
+/// Parse TRUST_STORES environment variable to determine which stores to use
+pub fn get_enabled_stores() -> Vec<String> {
+    if let Ok(trust_stores) = env::var("TRUST_STORES") {
+        trust_stores
+            .split(',')
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect()
+    } else {
+        // Default: all stores
+        vec!["system".to_string(), "nss".to_string(), "java".to_string()]
+    }
+}
+
+/// Check if a specific store is enabled
+pub fn is_store_enabled(store: &str) -> bool {
+    let enabled = get_enabled_stores();
+    enabled.contains(&store.to_lowercase())
+}
 
 #[cfg(target_os = "macos")]
 pub mod macos;
