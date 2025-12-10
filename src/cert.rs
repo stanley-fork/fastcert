@@ -172,6 +172,21 @@ pub fn calculate_cert_expiration() -> OffsetDateTime {
     OffsetDateTime::now_utc() + Duration::days(730 + 90)
 }
 
+/// Check if certificate is expiring soon (within 30 days)
+pub fn is_cert_expiring_soon(expiration: OffsetDateTime) -> bool {
+    let now = OffsetDateTime::now_utc();
+    let days_until_expiry = (expiration - now).whole_days();
+    days_until_expiry <= 30 && days_until_expiry >= 0
+}
+
+/// Print expiry warning if certificate is expiring soon
+pub fn check_cert_expiry_warning(expiration: OffsetDateTime) {
+    if is_cert_expiring_soon(expiration) {
+        let days = (expiration - OffsetDateTime::now_utc()).whole_days();
+        eprintln!("{} Certificate expires in {} days!", "Warning:".yellow().bold(), days);
+    }
+}
+
 fn generate_keypair(use_ecdsa: bool) -> Result<KeyPair> {
     let alg = if use_ecdsa {
         &PKCS_ECDSA_P256_SHA256
@@ -666,6 +681,7 @@ pub fn generate_from_csr(
 
     // Print expiration date
     let expiration = calculate_cert_expiration();
+    check_cert_expiry_warning(expiration);
     println!("It will expire on {}\n", format_expiration_date(expiration));
 
     Ok(())
@@ -829,6 +845,7 @@ fn generate_certificate_internal(
 
     // Print expiration date
     let expiration = calculate_cert_expiration();
+    check_cert_expiry_warning(expiration);
     println!("{} {}\n", "It will expire on".bright_white(), format_expiration_date(expiration));
 
     Ok(())
@@ -1301,5 +1318,26 @@ mod tests {
 
         // Invalid wildcard depth (tested via validate_wildcard_depth)
         assert!(validate_wildcard_depth("*.*.example.com").is_err());
+    }
+
+    #[test]
+    fn test_cert_expiry_check() {
+        let now = OffsetDateTime::now_utc();
+
+        // Not expiring soon (more than 30 days)
+        let far_future = now + Duration::days(60);
+        assert!(!is_cert_expiring_soon(far_future));
+
+        // Expiring soon (within 30 days)
+        let near_future = now + Duration::days(15);
+        assert!(is_cert_expiring_soon(near_future));
+
+        // Expiring very soon (1 day)
+        let very_soon = now + Duration::days(1);
+        assert!(is_cert_expiring_soon(very_soon));
+
+        // Already expired
+        let past = now - Duration::days(1);
+        assert!(!is_cert_expiring_soon(past));
     }
 }
