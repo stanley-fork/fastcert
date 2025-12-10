@@ -14,28 +14,43 @@ fi
 
 echo "🍺 Updating Homebrew formula for version $VERSION..."
 
-# Download the source tarball from GitHub
-TARBALL_URL="https://github.com/ozankasikci/fastcert/archive/refs/tags/v${VERSION}.tar.gz"
-TEMP_FILE=$(mktemp)
+# Download pre-built binaries and calculate SHA256
+echo "📥 Downloading pre-built binaries..."
 
-echo "📥 Downloading source tarball..."
-curl -sL "$TARBALL_URL" -o "$TEMP_FILE"
+TEMP_DIR=$(mktemp -d)
 
-# Calculate SHA256
+# macOS Intel (x86_64)
+MACOS_INTEL_URL="https://github.com/ozankasikci/fastcert/releases/download/v${VERSION}/fastcert-x86_64-apple-darwin.tar.gz"
+curl -sL "$MACOS_INTEL_URL" -o "$TEMP_DIR/macos-intel.tar.gz"
+
+# macOS Apple Silicon (aarch64)
+MACOS_ARM_URL="https://github.com/ozankasikci/fastcert/releases/download/v${VERSION}/fastcert-aarch64-apple-darwin.tar.gz"
+curl -sL "$MACOS_ARM_URL" -o "$TEMP_DIR/macos-arm.tar.gz"
+
+# Linux x86_64
+LINUX_URL="https://github.com/ozankasikci/fastcert/releases/download/v${VERSION}/fastcert-x86_64-unknown-linux-gnu.tar.gz"
+curl -sL "$LINUX_URL" -o "$TEMP_DIR/linux.tar.gz"
+
 echo "🔐 Calculating SHA256..."
 if command -v shasum >/dev/null 2>&1; then
-    SHA256=$(shasum -a 256 "$TEMP_FILE" | awk '{print $1}')
+    MACOS_INTEL_SHA256=$(shasum -a 256 "$TEMP_DIR/macos-intel.tar.gz" | awk '{print $1}')
+    MACOS_ARM_SHA256=$(shasum -a 256 "$TEMP_DIR/macos-arm.tar.gz" | awk '{print $1}')
+    LINUX_SHA256=$(shasum -a 256 "$TEMP_DIR/linux.tar.gz" | awk '{print $1}')
 elif command -v sha256sum >/dev/null 2>&1; then
-    SHA256=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
+    MACOS_INTEL_SHA256=$(sha256sum "$TEMP_DIR/macos-intel.tar.gz" | awk '{print $1}')
+    MACOS_ARM_SHA256=$(sha256sum "$TEMP_DIR/macos-arm.tar.gz" | awk '{print $1}')
+    LINUX_SHA256=$(sha256sum "$TEMP_DIR/linux.tar.gz" | awk '{print $1}')
 else
     echo "Error: Neither shasum nor sha256sum found"
-    rm "$TEMP_FILE"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
-rm "$TEMP_FILE"
+rm -rf "$TEMP_DIR"
 
-echo "✅ SHA256: $SHA256"
+echo "✅ macOS Intel SHA256: $MACOS_INTEL_SHA256"
+echo "✅ macOS ARM SHA256: $MACOS_ARM_SHA256"
+echo "✅ Linux SHA256: $LINUX_SHA256"
 
 # Create homebrew directory if it doesn't exist
 mkdir -p homebrew
@@ -46,19 +61,31 @@ cat > homebrew/fastcert.rb << EOF
 class Fastcert < Formula
   desc "Simple zero-config tool for making locally-trusted development certificates"
   homepage "https://github.com/ozankasikci/fastcert"
-  url "https://github.com/ozankasikci/fastcert/archive/refs/tags/v${VERSION}.tar.gz"
-  sha256 "${SHA256}"
+  version "${VERSION}"
   license "MIT"
-  head "https://github.com/ozankasikci/fastcert.git", branch: "master"
 
-  depends_on "rust" => :build
+  on_macos do
+    if Hardware::CPU.intel?
+      url "https://github.com/ozankasikci/fastcert/releases/download/v${VERSION}/fastcert-x86_64-apple-darwin.tar.gz"
+      sha256 "${MACOS_INTEL_SHA256}"
+    else
+      url "https://github.com/ozankasikci/fastcert/releases/download/v${VERSION}/fastcert-aarch64-apple-darwin.tar.gz"
+      sha256 "${MACOS_ARM_SHA256}"
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.intel?
+      url "https://github.com/ozankasikci/fastcert/releases/download/v${VERSION}/fastcert-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "${LINUX_SHA256}"
+    end
+  end
 
   def install
-    system "cargo", "install", *std_cargo_args
+    bin.install "fastcert"
   end
 
   test do
-    # Test that the binary exists and runs
     system "#{bin}/fastcert", "-CAROOT"
   end
 end
