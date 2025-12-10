@@ -100,31 +100,32 @@ fn generate_keypair(use_ecdsa: bool) -> Result<KeyPair> {
         .map_err(|e| Error::Certificate(format!("Key generation failed: {}", e)))
 }
 
-/// Build Subject Alternative Names from a list of host strings
-pub fn build_san_list(hosts: &[String]) -> Result<Vec<SanType>> {
-    let mut san_list = Vec::new();
-
-    for host in hosts {
-        let host_type = HostType::parse(host)?;
-        match host_type {
-            HostType::DnsName(name) => {
-                validate_hostname(&name)?;
-                check_wildcard_warning(&name);
-                san_list.push(SanType::DnsName(name));
-            }
-            HostType::IpAddress(ip) => {
-                san_list.push(SanType::IpAddress(ip));
-            }
-            HostType::Email(email) => {
-                san_list.push(SanType::Rfc822Name(email));
-            }
-            HostType::Uri(uri) => {
-                san_list.push(SanType::URI(uri));
-            }
+/// Process a single host and convert to SanType
+fn process_host_to_san(host: &str) -> Result<SanType> {
+    let host_type = HostType::parse(host)?;
+    match host_type {
+        HostType::DnsName(name) => {
+            validate_hostname(&name)?;
+            check_wildcard_warning(&name);
+            Ok(SanType::DnsName(name))
+        }
+        HostType::IpAddress(ip) => {
+            Ok(SanType::IpAddress(ip))
+        }
+        HostType::Email(email) => {
+            Ok(SanType::Rfc822Name(email))
+        }
+        HostType::Uri(uri) => {
+            Ok(SanType::URI(uri))
         }
     }
+}
 
-    Ok(san_list)
+/// Build Subject Alternative Names from a list of host strings
+pub fn build_san_list(hosts: &[String]) -> Result<Vec<SanType>> {
+    hosts.iter()
+        .map(|host| process_host_to_san(host))
+        .collect()
 }
 
 /// Check for wildcard certificates and log warnings
