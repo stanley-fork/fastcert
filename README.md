@@ -425,7 +425,6 @@ fastcert --debug -install
 
 **No.** fastcert is designed for development and testing only. Never use these certificates in production environments. The CA key is stored locally without additional protection, making it unsuitable for production use.
 
-
 ### Can I use this for internal services?
 
 While technically possible, it's not recommended. For internal services, consider using a proper internal PKI solution. fastcert is best suited for local development.
