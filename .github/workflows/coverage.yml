@@ -19,27 +19,40 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
+        run: |
+          cargo install cargo-tarpaulin --version 0.27.3 || cargo install cargo-tarpaulin
 
       - name: Generate coverage
-        run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+        run: |
+          cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml --output-dir .
 
       - name: Extract coverage percentage
         id: coverage
         run: |
-          COVERAGE=$(grep -oP '(?<=line-rate=")[^"]*' cobertura.xml | head -1 | awk '{printf "%.2f", $1*100}')
+          # Extract coverage from cobertura.xml using standard grep
+          COVERAGE=$(grep 'line-rate=' cobertura.xml | head -1 | sed 's/.*line-rate="\([^"]*\)".*/\1/' | awk '{printf "%.2f", $1*100}')
           echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
           echo "Coverage: $COVERAGE%"
 
+      - name: Install coverage-badge CLI
+        run: cargo install coverage-badge
+
       - name: Generate coverage badge
-        uses: ozankasikci/rust-test-coverage-badge@v1
-        with:
-          coverage: ${{ steps.coverage.outputs.percentage }}
-          output: assets/coverage.svg
-          commit: true
+        run: |
+          mkdir -p assets
+          coverage-badge -c ${{ steps.coverage.outputs.percentage }} -o assets/coverage.svg
+
+      - name: Commit badge
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add assets/coverage.svg
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update coverage badge"
+          git push || echo "No changes to push"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: ./cobertura.xml
           fail_ci_if_error: false
+        continue-on-error: true
