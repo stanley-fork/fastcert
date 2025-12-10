@@ -60,6 +60,7 @@ impl HostType {
 
         // Try URI (has scheme)
         if host.contains("://") {
+            validate_uri(host)?;
             return Ok(HostType::Uri(host.to_string()));
         }
 
@@ -100,6 +101,26 @@ pub fn validate_email_address(email: &str) -> Result<()> {
 
     if !email_regex.is_match(email) {
         return Err(Error::InvalidHostname(format!("Invalid email address: {}", email)));
+    }
+
+    Ok(())
+}
+
+/// Validate URI format
+pub fn validate_uri(uri: &str) -> Result<()> {
+    // Basic URI validation - must have scheme and path
+    let uri_regex = Regex::new(r"^[a-zA-Z][a-zA-Z0-9+.-]*://[^\s]+$").unwrap();
+
+    if !uri_regex.is_match(uri) {
+        return Err(Error::InvalidHostname(format!("Invalid URI format: {}", uri)));
+    }
+
+    // Ensure scheme is valid
+    if let Some(scheme_end) = uri.find("://") {
+        let scheme = &uri[..scheme_end];
+        if scheme.is_empty() {
+            return Err(Error::InvalidHostname(format!("URI must have a scheme: {}", uri)));
+        }
     }
 
     Ok(())
@@ -1208,5 +1229,20 @@ mod tests {
         assert!(validate_email_address("@example.com").is_err());
         assert!(validate_email_address("test@").is_err());
         assert!(validate_email_address("test @example.com").is_err());
+    }
+
+    #[test]
+    fn test_uri_validation() {
+        // Valid URIs
+        assert!(validate_uri("https://example.com").is_ok());
+        assert!(validate_uri("http://localhost:8080/path").is_ok());
+        assert!(validate_uri("ftp://files.example.com").is_ok());
+        assert!(validate_uri("custom-scheme://resource").is_ok());
+
+        // Invalid URIs
+        assert!(validate_uri("not-a-uri").is_err());
+        assert!(validate_uri("://missing-scheme").is_err());
+        assert!(validate_uri("http://").is_err());
+        assert!(validate_uri("http:// space.com").is_err());
     }
 }
