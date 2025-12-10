@@ -14,13 +14,38 @@ use std::os::unix::fs::PermissionsExt;
 const ROOT_CERT_FILE: &str = "rootCA.pem";
 const ROOT_KEY_FILE: &str = "rootCA-key.pem";
 
-/// Get the CAROOT directory path
+/// Get the CAROOT directory path as a string.
+///
+/// Returns the directory where the CA certificate and key are stored.
+/// This can be customized via the `CAROOT` environment variable.
+///
+/// # Returns
+///
+/// The CAROOT directory path as a `String`.
+///
+/// # Errors
+///
+/// Returns an error if the CAROOT directory cannot be determined.
 pub fn get_caroot() -> Result<String> {
     let caroot = get_caroot_path()?;
     Ok(caroot.display().to_string())
 }
 
-/// Get the CAROOT directory path as PathBuf
+/// Get the CAROOT directory path as PathBuf.
+///
+/// Checks the `CAROOT` environment variable first, then falls back to
+/// platform-specific default locations:
+/// - macOS: `~/Library/Application Support/rscert`
+/// - Windows: `%LOCALAPPDATA%\rscert`
+/// - Linux: `~/.local/share/rscert`
+///
+/// # Returns
+///
+/// The CAROOT directory path as a `PathBuf`.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be determined.
 fn get_caroot_path() -> Result<PathBuf> {
     // Check CAROOT environment variable
     if let Ok(caroot) = std::env::var("CAROOT") {
@@ -52,7 +77,26 @@ fn get_caroot_path() -> Result<PathBuf> {
     Err(Error::Certificate("Could not determine CAROOT directory".to_string()))
 }
 
-/// Install the CA certificate into the system trust store
+/// Install the CA certificate into the system trust store.
+///
+/// This function loads or creates a CA certificate and installs it into
+/// the appropriate trust stores for the current platform:
+/// - macOS: System Keychain
+/// - Linux: System CA certificates and NSS databases
+/// - Windows: Windows Certificate Store
+///
+/// The CA certificate is automatically created if it doesn't exist.
+///
+/// # Returns
+///
+/// `Ok(())` on successful installation, or an error if installation fails.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The CA directory cannot be created
+/// - The CA certificate cannot be generated or loaded
+/// - System trust store installation fails (may require elevated privileges)
 pub fn install() -> Result<()> {
     let caroot = get_caroot_path()?;
     let mut ca = CertificateAuthority::new(caroot);
@@ -82,7 +126,21 @@ pub fn install() -> Result<()> {
     Ok(())
 }
 
-/// Uninstall the CA certificate from the system trust store
+/// Uninstall the CA certificate from the system trust store.
+///
+/// Removes the CA certificate from all system trust stores where it was
+/// installed, but does not delete the CA certificate files themselves.
+/// The certificate can be reinstalled later without regeneration.
+///
+/// # Returns
+///
+/// `Ok(())` on successful uninstallation, or an error if uninstallation fails.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The CA certificate cannot be read
+/// - System trust store uninstallation fails (may require elevated privileges)
 pub fn uninstall() -> Result<()> {
     let caroot = get_caroot_path()?;
     let ca = CertificateAuthority::new(caroot);
@@ -116,19 +174,47 @@ pub fn uninstall() -> Result<()> {
     Ok(())
 }
 
-/// Get the CertificateAuthority for the default CAROOT
+/// Get the CertificateAuthority instance for the default CAROOT location.
+///
+/// Creates a new `CertificateAuthority` instance pointing to the default
+/// CAROOT directory. The CA may or may not exist yet.
+///
+/// # Returns
+///
+/// A `CertificateAuthority` instance.
+///
+/// # Errors
+///
+/// Returns an error if the CAROOT path cannot be determined.
 pub fn get_ca() -> Result<CertificateAuthority> {
     let caroot = get_caroot_path()?;
     Ok(CertificateAuthority::new(caroot))
 }
 
+/// Certificate Authority management structure.
+///
+/// Manages the local CA certificate and private key used to sign
+/// development certificates. Provides methods for creating, loading,
+/// and managing the CA lifecycle.
 pub struct CertificateAuthority {
+    /// Path to the directory containing CA files
     root_path: PathBuf,
+    /// The CA certificate (loaded or generated)
     cert: Option<Certificate>,
+    /// PEM-encoded CA certificate
     cert_pem: Option<String>,
 }
 
 impl CertificateAuthority {
+    /// Create a new CertificateAuthority instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `root_path` - Directory where CA certificate and key will be stored
+    ///
+    /// # Returns
+    ///
+    /// A new `CertificateAuthority` instance.
     pub fn new(root_path: PathBuf) -> Self {
         Self {
             root_path,
@@ -137,10 +223,22 @@ impl CertificateAuthority {
         }
     }
 
+    /// Get the root path of this CA.
+    ///
+    /// # Returns
+    ///
+    /// Reference to the CA root directory path.
     pub fn root_path(&self) -> &Path {
         &self.root_path
     }
 
+    /// Initialize the CA directory structure.
+    ///
+    /// Creates the root directory if it doesn't exist.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an IO error if directory creation fails.
     pub fn init(&self) -> Result<()> {
         if !self.root_path.exists() {
             fs::create_dir_all(&self.root_path)?;
@@ -148,22 +246,57 @@ impl CertificateAuthority {
         Ok(())
     }
 
+    /// Get the path to the CA certificate file.
+    ///
+    /// # Returns
+    ///
+    /// Full path to `rootCA.pem`.
     pub fn cert_path(&self) -> PathBuf {
         self.root_path.join(ROOT_CERT_FILE)
     }
 
+    /// Get the path to the CA private key file.
+    ///
+    /// # Returns
+    ///
+    /// Full path to `rootCA-key.pem`.
     pub fn key_path(&self) -> PathBuf {
         self.root_path.join(ROOT_KEY_FILE)
     }
 
+    /// Check if the CA certificate file exists.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the certificate file exists, `false` otherwise.
     pub fn cert_exists(&self) -> bool {
         self.cert_path().exists()
     }
 
+    /// Check if the CA private key file exists.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the key file exists, `false` otherwise.
     pub fn key_exists(&self) -> bool {
         self.key_path().exists()
     }
 
+    /// Create a new CA certificate and key pair.
+    ///
+    /// Generates a new 2048-bit RSA key pair and creates a self-signed
+    /// CA certificate valid for 10 years. The certificate includes:
+    /// - Subject: `fastcert <user>@<hostname>`
+    /// - Basic Constraints: CA=true
+    /// - Key Usage: Certificate Sign, CRL Sign
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if generation fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if certificate generation or serialization fails.
     pub fn create_ca(&mut self) -> Result<()> {
         eprintln!("{}", "Generating CA certificate...".cyan());
         let params = create_ca_params()
@@ -181,6 +314,22 @@ impl CertificateAuthority {
         Ok(())
     }
 
+    /// Save the CA certificate and private key to disk.
+    ///
+    /// Writes the CA certificate to `rootCA.pem` with permissions 0644,
+    /// and the private key to `rootCA-key.pem` with permissions 0400
+    /// (Unix only).
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if file operations fail.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No certificate has been generated or loaded
+    /// - File creation or writing fails
+    /// - Permission setting fails (Unix)
     pub fn save(&self) -> Result<()> {
         let cert_pem = self.cert_pem.as_ref()
             .ok_or_else(|| Error::Certificate("No certificate available to save".to_string()))?;
@@ -212,6 +361,20 @@ impl CertificateAuthority {
         Ok(())
     }
 
+    /// Load an existing CA certificate from disk.
+    ///
+    /// Reads the CA certificate PEM file and stores it in memory.
+    /// Does not load the private key.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if loading fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The certificate file doesn't exist
+    /// - The file cannot be read
     pub fn load(&mut self) -> Result<()> {
         let cert_path = self.cert_path();
         if !cert_path.exists() {
@@ -227,6 +390,23 @@ impl CertificateAuthority {
         Ok(())
     }
 
+    /// Load existing CA or create a new one if it doesn't exist.
+    ///
+    /// This is the primary method for initializing a CA. It will:
+    /// 1. Create the CA directory if needed
+    /// 2. Load the existing CA certificate if present
+    /// 3. Generate and save a new CA if no certificate exists
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if operations fail.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Directory creation fails
+    /// - CA generation fails
+    /// - File operations fail
     pub fn load_or_create(&mut self) -> Result<()> {
         self.init()?;
 
@@ -241,7 +421,22 @@ impl CertificateAuthority {
         Ok(())
     }
 
-    /// Get a unique name for the CA certificate (for use in trust stores)
+    /// Get a unique name for the CA certificate for use in trust stores.
+    ///
+    /// Generates a name like "fastcert development CA <serial>" where
+    /// <serial> is the certificate's serial number. This ensures the
+    /// CA can be uniquely identified in system trust stores.
+    ///
+    /// # Returns
+    ///
+    /// A unique name string for this CA.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The certificate file cannot be read
+    /// - PEM parsing fails
+    /// - Certificate parsing fails
     pub fn unique_name(&self) -> Result<String> {
         // Parse the certificate to get the serial number
         let cert_pem = fs::read_to_string(&self.cert_path())?;
@@ -259,7 +454,19 @@ impl CertificateAuthority {
         Ok(format!("fastcert development CA {}", serial))
     }
 
-    /// Get the serial number of the CA certificate
+    /// Get the serial number of the CA certificate.
+    ///
+    /// Extracts and returns the certificate serial number as a hex string.
+    ///
+    /// # Returns
+    ///
+    /// The serial number as a hexadecimal string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The certificate file cannot be read
+    /// - PEM or certificate parsing fails
     pub fn get_serial_number(&self) -> Result<String> {
         let cert_pem = fs::read_to_string(&self.cert_path())?;
         let pem_data = pem::parse(&cert_pem)
@@ -271,7 +478,23 @@ impl CertificateAuthority {
     }
 }
 
-/// Check if a serial number is unique (not used by another CA certificate)
+/// Check if a serial number is unique (not used by another CA certificate).
+///
+/// Compares the given serial number with the serial of the CA certificate
+/// at the specified path. Used to detect if a CA has been regenerated.
+///
+/// # Arguments
+///
+/// * `serial` - The serial number to check (hex string)
+/// * `ca_path` - Path to the CA directory to check against
+///
+/// # Returns
+///
+/// `true` if the serial is unique (different), `false` if it matches.
+///
+/// # Errors
+///
+/// Returns an error if certificate operations fail.
 pub fn is_serial_unique(serial: &str, ca_path: &Path) -> Result<bool> {
     if !ca_path.exists() {
         return Ok(true);
@@ -286,6 +509,14 @@ pub fn is_serial_unique(serial: &str, ca_path: &Path) -> Result<bool> {
     Ok(existing_serial != serial)
 }
 
+/// Get the current username and hostname in "user@hostname" format.
+///
+/// Used to personalize the CA certificate subject. Falls back to
+/// "unknown@unknown" if the information cannot be determined.
+///
+/// # Returns
+///
+/// A string in the format "username@hostname".
 fn get_user_and_hostname() -> String {
     let username = std::env::var("USER")
         .or_else(|_| std::env::var("USERNAME"))
@@ -299,6 +530,21 @@ fn get_user_and_hostname() -> String {
     format!("{}@{}", username, hostname)
 }
 
+/// Create certificate parameters for a new CA certificate.
+///
+/// Generates parameters for a self-signed CA certificate with:
+/// - Subject: fastcert development CA / user@hostname / fastcert user@hostname
+/// - Validity: 10 years from now
+/// - Basic Constraints: CA=true (unconstrained)
+/// - Key Usage: Certificate Sign, CRL Sign
+///
+/// # Returns
+///
+/// `CertificateParams` configured for CA use.
+///
+/// # Errors
+///
+/// Returns an error if parameter creation fails.
 fn create_ca_params() -> Result<CertificateParams> {
     let user_host = get_user_and_hostname();
 
