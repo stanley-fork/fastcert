@@ -95,6 +95,110 @@ rscert example.com localhost 127.0.0.1 ::1
 rscert "*.example.com"
 ```
 
+## Usage Examples
+
+### Basic Certificate Generation
+
+Generate a certificate for a single domain:
+```bash
+rscert example.com
+```
+
+This creates two files:
+- `example.com.pem` - the certificate
+- `example.com-key.pem` - the private key
+
+### Multiple Domains
+
+Generate a certificate valid for multiple domains and IP addresses:
+```bash
+rscert example.com localhost 127.0.0.1 ::1
+```
+
+The files will be named `example.com+3.pem` and `example.com+3-key.pem` (the +3 indicates 3 additional names beyond the first).
+
+### Wildcard Certificates
+
+Generate a wildcard certificate:
+```bash
+rscert "*.example.com"
+```
+
+Creates `_wildcard.example.com.pem` and `_wildcard.example.com-key.pem`.
+
+### Custom File Names
+
+Specify custom output file names:
+```bash
+rscert --cert-file mycert.pem --key-file mykey.pem example.com
+```
+
+### ECDSA Keys
+
+Generate a certificate with an ECDSA key instead of RSA:
+```bash
+rscert --ecdsa example.com
+```
+
+ECDSA keys are smaller and faster than RSA keys.
+
+### Client Certificates
+
+Generate a certificate for client authentication:
+```bash
+rscert --client client.example.com
+```
+
+### PKCS12 Format
+
+Generate a PKCS12 file (.pfx) containing both certificate and key:
+```bash
+rscert --pkcs12 example.com
+```
+
+Or specify a custom PKCS12 file path:
+```bash
+rscert --p12-file mycert.pfx example.com
+```
+
+### Certificate Signing Requests
+
+Generate a certificate from an existing CSR:
+```bash
+rscert --csr mycsr.pem --cert-file mycert.pem
+```
+
+### Managing the CA
+
+View the CA certificate location:
+```bash
+rscert -CAROOT
+```
+
+Install the CA in system trust stores:
+```bash
+rscert -install
+```
+
+Uninstall the CA from system trust stores (but keep the certificate):
+```bash
+rscert -uninstall
+```
+
+### Environment Variables
+
+Set a custom CA location:
+```bash
+export CAROOT="$HOME/my-ca"
+rscert -install
+```
+
+Specify which trust stores to use:
+```bash
+export TRUST_STORES="system,firefox,java"
+rscert -install
+```
+
 ## Platform Support
 
 - macOS 10.12+
