@@ -579,7 +579,7 @@ The CA key is the most sensitive file. Keep it secure and never share it. If you
 
 ## Acknowledgments
 
-This project was inspired by [fastcert](https://github.com/FiloSottile/fastcert).
+This project was inspired by [mkcert](https://github.com/FiloSottile/mkcert).
 
 ## License
 
