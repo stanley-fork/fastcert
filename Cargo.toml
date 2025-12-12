@@ -12,6 +12,14 @@ keywords = ["certificate", "tls", "ssl", "development", "localhost"]
 categories = ["command-line-utilities", "development-tools"]
 authors = ["Ozan Kasikci <ozan@kasikci.io>"]
 
+[lib]
+name = "fastcert"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fastcert"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0"
 thiserror = "1.0"

@@ -1,4 +1,50 @@
-//! fastcert - A tool for creating locally-trusted development certificates
+//! # fastcert
+//!
+//! A library for generating locally-trusted development certificates.
+//!
+//! fastcert creates a local certificate authority (CA) and uses it to sign
+//! certificates for development. The CA can be installed in system trust stores
+//! to make all certificates it signs trusted by browsers and tools.
+//!
+//! ## Quick Start
+//!
+//! ```no_run
+//! use fastcert::CA;
+//!
+//! // Install CA to system trust stores
+//! let ca = CA::load_or_create()?;
+//! ca.install()?;
+//!
+//! // Generate a certificate
+//! ca.issue_certificate()?
+//!     .domains(vec!["example.com".to_string()])
+//!     .build()?;
+//! # Ok::<(), fastcert::Error>(())
+//! ```
+//!
+//! ## Advanced Usage
+//!
+//! ```no_run
+//! use fastcert::{CA, KeyType};
+//!
+//! // Custom CA location
+//! let ca = CA::new("/custom/path").load_or_create()?;
+//!
+//! // Certificate with all options
+//! ca.issue_certificate()?
+//!     .domains(vec![
+//!         "example.com".to_string(),
+//!         "*.example.com".to_string(),
+//!         "localhost".to_string(),
+//!         "127.0.0.1".to_string(),
+//!     ])
+//!     .key_type(KeyType::ECDSA)
+//!     .client_cert(true)
+//!     .cert_file("my-cert.pem")
+//!     .key_file("my-key.pem")
+//!     .build()?;
+//! # Ok::<(), fastcert::Error>(())
+//! ```
 
 pub mod ca;
 pub mod cert;
@@ -6,7 +52,68 @@ pub mod error;
 pub mod fileutil;
 pub mod truststore;
 
+// Re-export main types at crate root
+pub use ca::CA;
+pub use cert::{CertificateBuilder, KeyType};
 pub use error::{Error, Result};
+
+// Convenience functions for simple use cases
+
+/// Generate a certificate with default settings
+///
+/// This is a convenience function that creates/loads the CA and generates
+/// a certificate with the specified domains. For more control, use the
+/// builder API via `CA::load_or_create()?.issue_certificate()`.
+///
+/// # Example
+///
+/// ```no_run
+/// fastcert::generate_cert(&[
+///     "example.com".to_string(),
+///     "localhost".to_string(),
+/// ])?;
+/// # Ok::<(), fastcert::Error>(())
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if CA operations or certificate generation fails.
+pub fn generate_cert(domains: &[String]) -> Result<()> {
+    CA::load_or_create()?
+        .issue_certificate()?
+        .domains(domains.to_vec())
+        .build()
+}
+
+/// Install the CA to system trust stores
+///
+/// Convenience function that loads/creates the CA and installs it.
+/// For more control, use the ca module functions directly.
+///
+/// # Example
+///
+/// ```no_run
+/// fastcert::install()?;
+/// # Ok::<(), fastcert::Error>(())
+/// ```
+pub fn install() -> Result<()> {
+    ca::install()
+}
+
+/// Uninstall the CA from system trust stores
+///
+/// Convenience function that uninstalls the CA without deleting it.
+/// For more control, use `CA::load_or_create()?.uninstall()`.
+///
+/// # Example
+///
+/// ```no_run
+/// fastcert::uninstall()?;
+/// # Ok::<(), fastcert::Error>(())
+/// ```
+pub fn uninstall() -> Result<()> {
+    ca::uninstall()
+}
 
 /// Check if verbose mode is enabled
 pub fn is_verbose() -> bool {
