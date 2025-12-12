@@ -91,6 +91,61 @@ cargo build --release
 # The binary will be in target/release/fastcert
 ```
 
+## Library Usage
+
+fastcert can be used as a library in your Rust programs:
+
+```toml
+[dependencies]
+fastcert = "0.4"
+```
+
+### Basic Example
+
+```rust
+use fastcert::CA;
+
+fn main() -> fastcert::Result<()> {
+    // Install CA to system trust stores
+    let ca = CA::load_or_create()?;
+    ca.install()?;
+
+    // Generate a certificate
+    ca.issue_certificate()
+        .domains(vec!["localhost".to_string()])
+        .build()?;
+
+    Ok(())
+}
+```
+
+### Advanced Example
+
+```rust
+use fastcert::{CA, KeyType};
+
+fn main() -> fastcert::Result<()> {
+    // Custom CA location
+    let ca = CA::new("/opt/my-ca").load_or_create()?;
+
+    // ECDSA certificate with multiple domains
+    ca.issue_certificate()
+        .domains(vec![
+            "example.com".to_string(),
+            "*.example.com".to_string(),
+            "localhost".to_string(),
+        ])
+        .key_type(KeyType::ECDSA)
+        .cert_file("my-cert.pem")
+        .key_file("my-key.pem")
+        .build()?;
+
+    Ok(())
+}
+```
+
+See [API documentation](https://docs.rs/fastcert) for complete details.
+
 ### Prerequisites
 
 - Rust 1.70 or later
