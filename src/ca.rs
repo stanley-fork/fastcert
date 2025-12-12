@@ -528,6 +528,38 @@ impl CertificateAuthority {
             .1;
         Ok(cert.serial.to_str_radix(16))
     }
+
+    /// Create a certificate builder for issuing new certificates
+    ///
+    /// Returns a `CertificateBuilder` that can be configured and built.
+    /// The CA must be loaded before calling this method.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use fastcert::CA;
+    /// let ca = CA::load_or_create()?;
+    /// ca.issue_certificate()
+    ///     .domains(vec!["example.com".to_string()])
+    ///     .build()?;
+    /// # Ok::<(), fastcert::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the CA certificate or key hasn't been loaded.
+    pub fn issue_certificate(&self) -> Result<crate::cert::CertificateBuilder> {
+        let ca_cert_pem = self.cert_pem.as_ref()
+            .ok_or_else(|| Error::Certificate("CA not loaded. Call load_or_create() first.".to_string()))?;
+
+        let ca_key_pem = self.key_pem.as_ref()
+            .ok_or_else(|| Error::Certificate("CA key not loaded. Call load_or_create() first.".to_string()))?;
+
+        Ok(crate::cert::CertificateBuilder::new(
+            ca_cert_pem.clone(),
+            ca_key_pem.clone(),
+        ))
+    }
 }
 
 /// Check if a serial number is unique (not used by another CA certificate).
