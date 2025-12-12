@@ -46,7 +46,11 @@ fn test_ca_custom_location() -> Result<()> {
 
     // Verify CA was created in the custom location
     assert!(ca.cert_path().exists(), "CA certificate should exist");
-    assert_eq!(ca.root_path(), ca_path.as_path(), "Root path should match custom path");
+    assert_eq!(
+        ca.root_path(),
+        ca_path.as_path(),
+        "Root path should match custom path"
+    );
 
     // Verify files are in the custom directory
     assert!(ca.cert_path().starts_with(&ca_path));
@@ -85,8 +89,14 @@ fn test_issue_certificate_basic() -> Result<()> {
     let cert_content = fs::read_to_string(&cert_file)?;
     let key_content = fs::read_to_string(&key_file)?;
 
-    assert!(cert_content.contains("BEGIN CERTIFICATE"), "Cert should be in PEM format");
-    assert!(key_content.contains("PRIVATE KEY"), "Key should be in PEM format");
+    assert!(
+        cert_content.contains("BEGIN CERTIFICATE"),
+        "Cert should be in PEM format"
+    );
+    assert!(
+        key_content.contains("PRIVATE KEY"),
+        "Key should be in PEM format"
+    );
 
     unsafe {
         env::remove_var("CAROOT");
@@ -163,7 +173,10 @@ fn test_issue_certificate_client_cert() -> Result<()> {
 
     // Verify files contain valid PEM data
     let cert_content = fs::read_to_string(&cert_file)?;
-    assert!(cert_content.contains("BEGIN CERTIFICATE"), "Client cert should be in PEM format");
+    assert!(
+        cert_content.contains("BEGIN CERTIFICATE"),
+        "Client cert should be in PEM format"
+    );
 
     unsafe {
         env::remove_var("CAROOT");
@@ -187,7 +200,10 @@ fn test_issue_certificate_no_domains_error() {
     let result = ca.issue_certificate().unwrap().build();
 
     // Should return an error
-    assert!(result.is_err(), "Building without domains should return an error");
+    assert!(
+        result.is_err(),
+        "Building without domains should return an error"
+    );
 
     // Error message should mention domains
     let error_msg = result.unwrap_err().to_string();

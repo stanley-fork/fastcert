@@ -89,18 +89,13 @@ pub enum HostType {
 }
 
 /// Key type for certificate generation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum KeyType {
     /// RSA 2048-bit key (default, maximum compatibility)
+    #[default]
     RSA2048,
     /// ECDSA P-256 key (better performance, smaller keys)
     ECDSA,
-}
-
-impl Default for KeyType {
-    fn default() -> Self {
-        Self::RSA2048
-    }
 }
 
 /// Builder for certificate generation
@@ -243,7 +238,9 @@ impl CertificateBuilder {
     /// - File writing fails
     pub fn build(self) -> Result<()> {
         if self.domains.is_empty() {
-            return Err(Error::Certificate("No domains specified. Use .domains() to set domains.".to_string()));
+            return Err(Error::Certificate(
+                "No domains specified. Use .domains() to set domains.".to_string(),
+            ));
         }
 
         // Convert to CertificateConfig

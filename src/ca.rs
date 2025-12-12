@@ -550,11 +550,13 @@ impl CertificateAuthority {
     ///
     /// Returns an error if the CA certificate or key hasn't been loaded.
     pub fn issue_certificate(&self) -> Result<crate::cert::CertificateBuilder> {
-        let ca_cert_pem = self.cert_pem.as_ref()
-            .ok_or_else(|| Error::Certificate("CA not loaded. Call load_or_create() first.".to_string()))?;
+        let ca_cert_pem = self.cert_pem.as_ref().ok_or_else(|| {
+            Error::Certificate("CA not loaded. Call load_or_create() first.".to_string())
+        })?;
 
-        let ca_key_pem = self.key_pem.as_ref()
-            .ok_or_else(|| Error::Certificate("CA key not loaded. Call load_or_create() first.".to_string()))?;
+        let ca_key_pem = self.key_pem.as_ref().ok_or_else(|| {
+            Error::Certificate("CA key not loaded. Call load_or_create() first.".to_string())
+        })?;
 
         Ok(crate::cert::CertificateBuilder::new(
             ca_cert_pem.clone(),
@@ -603,7 +605,9 @@ impl CertificateAuthority {
 
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {
-            println!("Note: System trust store installation not yet implemented for this platform.");
+            println!(
+                "Note: System trust store installation not yet implemented for this platform."
+            );
             println!(
                 "You may need to manually import the CA certificate from: {}",
                 self.cert_path().display()
@@ -651,7 +655,9 @@ impl CertificateAuthority {
 
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {
-            println!("Note: System trust store uninstallation not yet implemented for this platform.");
+            println!(
+                "Note: System trust store uninstallation not yet implemented for this platform."
+            );
             println!(
                 "You may need to manually remove the CA certificate from your system trust store."
             );
