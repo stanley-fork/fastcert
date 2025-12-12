@@ -123,10 +123,12 @@ fn main() -> fastcert::Result<()> {
 
 ```rust
 use fastcert::{CA, KeyType};
+use std::path::PathBuf;
 
 fn main() -> fastcert::Result<()> {
     // Custom CA location
-    let ca = CA::new("/opt/my-ca").load_or_create()?;
+    let mut ca = CA::new(PathBuf::from("/opt/my-ca"));
+    ca.init_ca()?;
 
     // ECDSA certificate with multiple domains
     ca.issue_certificate()
