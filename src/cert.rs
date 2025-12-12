@@ -125,7 +125,6 @@ pub struct CertificateBuilder {
     domains: Vec<String>,
     key_type: KeyType,
     client_cert: bool,
-    validity_days: Option<u32>,
     cert_file: Option<String>,
     key_file: Option<String>,
     p12_file: Option<String>,
@@ -140,7 +139,6 @@ impl CertificateBuilder {
             domains: Vec::new(),
             key_type: KeyType::default(),
             client_cert: false,
-            validity_days: None,
             cert_file: None,
             key_file: None,
             p12_file: None,
@@ -203,14 +201,6 @@ impl CertificateBuilder {
     /// ```
     pub fn client_cert(mut self, client: bool) -> Self {
         self.client_cert = client;
-        self
-    }
-
-    /// Set certificate validity in days (default: 825)
-    ///
-    /// Note: 825 days is the maximum accepted by browsers.
-    pub fn validity_days(mut self, days: u32) -> Self {
-        self.validity_days = Some(days);
         self
     }
 
