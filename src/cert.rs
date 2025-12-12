@@ -1500,15 +1500,72 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: Fix CSR generation with rcgen 0.14 - serialize_request_der() was removed
     fn test_csr_pem_parsing() {
-        // TODO: Update this test for rcgen 0.14 CSR API
+        // Valid CSR PEM for testing (generated with OpenSSL)
+        let csr_pem = b"-----BEGIN CERTIFICATE REQUEST-----
+MIICvDCCAaQCAQAwdzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xFDASBgNVBAoMC0V4YW1wbGUgSW5jMREw
+DwYDVQQLDAhJVCBEZXB0LjESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG
+9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoWaiu6ab0Q0NQWnlFQwZCZOlkwd3scM1lJI0
+kP4dOnu50p3HFWUnc2Mc7drSKGmX/yEzXNjPcTGFdJKFJo8yJns7yw1phGSC0S5B
+TDkdyGfhgUgWPb45NeqQC7K8q18XR6MXULw2963Ytq0YbKgm8lacDEAJj88neOSR
+N4zMk7uOOASrhMl8NqnJwAplyq70eV1OFpKZ0Ntxeb7gip64I0tstqKN20xbayeL
+LQ7lwgjhn0NV8ShFyvlBLktyz/yAdbbWawqM4dYRDwaMCqQklPE28q8jVOvHaFXa
+O9mSI2BwsPqrrs98GmBjJ0wiRbK1RbJdrT8E6lxjDPBo3TDEVQIDAQABoAAwDQYJ
+KoZIhvcNAQELBQADggEBAEtJXJLSwJNx0De9AAfEU8gQVfVVMzJ005j0hM8PYPPE
+XWEidCiKR1SYd4msHSEk0vOZyd/BUSLLmKxdKYlApYfdEMmD+2WdoOGLjw9YENpE
+19mYto7nTcavo3aQpZDnqJFmDVERzfRDaCEGisFa9jnvU3mx0yNyvuSysatLKJQQ
+K7kHtD0BxJXsEllUceAuqnzOOdF2OaEiddNqv2+hGCgPIk3ZFPERxnnZrK+KFeYN
+kb7kAJF8Fm3hIQzeVyAp84CpFj/RmWm+VaEbBMGyOKmrYMI0lw4Z1bMqAf/w7dU1
+Hdy3K7d4rELyODVkKr06Q+NjLKWrNWWUlWCsFfh/xeU=
+-----END CERTIFICATE REQUEST-----
+";
+
+        let result = parse_csr_pem(csr_pem);
+        assert!(result.is_ok());
+        let der = result.unwrap();
+        // DER should be non-empty
+        assert!(!der.is_empty());
+        // DER should start with SEQUENCE tag (0x30)
+        assert_eq!(der[0], 0x30);
     }
 
     #[test]
-    #[ignore] // TODO: Fix CSR generation with rcgen 0.14 - serialize_request_der() was removed
     fn test_extract_san_from_csr() {
-        // TODO: Update this test for rcgen 0.14 CSR API
+        use x509_parser::prelude::*;
+
+        // Valid CSR PEM for testing (with CN=localhost)
+        let csr_pem = b"-----BEGIN CERTIFICATE REQUEST-----
+MIICvDCCAaQCAQAwdzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xFDASBgNVBAoMC0V4YW1wbGUgSW5jMREw
+DwYDVQQLDAhJVCBEZXB0LjESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG
+9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoWaiu6ab0Q0NQWnlFQwZCZOlkwd3scM1lJI0
+kP4dOnu50p3HFWUnc2Mc7drSKGmX/yEzXNjPcTGFdJKFJo8yJns7yw1phGSC0S5B
+TDkdyGfhgUgWPb45NeqQC7K8q18XR6MXULw2963Ytq0YbKgm8lacDEAJj88neOSR
+N4zMk7uOOASrhMl8NqnJwAplyq70eV1OFpKZ0Ntxeb7gip64I0tstqKN20xbayeL
+LQ7lwgjhn0NV8ShFyvlBLktyz/yAdbbWawqM4dYRDwaMCqQklPE28q8jVOvHaFXa
+O9mSI2BwsPqrrs98GmBjJ0wiRbK1RbJdrT8E6lxjDPBo3TDEVQIDAQABoAAwDQYJ
+KoZIhvcNAQELBQADggEBAEtJXJLSwJNx0De9AAfEU8gQVfVVMzJ005j0hM8PYPPE
+XWEidCiKR1SYd4msHSEk0vOZyd/BUSLLmKxdKYlApYfdEMmD+2WdoOGLjw9YENpE
+19mYto7nTcavo3aQpZDnqJFmDVERzfRDaCEGisFa9jnvU3mx0yNyvuSysatLKJQQ
+K7kHtD0BxJXsEllUceAuqnzOOdF2OaEiddNqv2+hGCgPIk3ZFPERxnnZrK+KFeYN
+kb7kAJF8Fm3hIQzeVyAp84CpFj/RmWm+VaEbBMGyOKmrYMI0lw4Z1bMqAf/w7dU1
+Hdy3K7d4rELyODVkKr06Q+NjLKWrNWWUlWCsFfh/xeU=
+-----END CERTIFICATE REQUEST-----
+";
+
+        // Parse the CSR PEM to DER
+        let der = parse_csr_pem(csr_pem).unwrap();
+
+        // Parse the CSR
+        let (_, csr) = X509CertificationRequest::from_der(&der).unwrap();
+
+        // Extract SANs (actually just CN for now)
+        let result = extract_san_from_csr(&csr);
+        assert!(result.is_ok());
+        let hosts = result.unwrap();
+        assert_eq!(hosts.len(), 1);
+        assert_eq!(hosts[0], "localhost");
     }
 
     #[test]
