@@ -224,8 +224,20 @@ fn main() -> Result<()> {
         if let Some(ref f) = cli.key_file {
             builder = builder.key_file(f);
         }
+        // Handle PKCS#12 mode: either explicit p12-file or --pkcs12 flag
         if let Some(ref f) = cli.p12_file {
             builder = builder.pkcs12_file(f);
+        } else if cli.pkcs12 {
+            // When --pkcs12 is set without --p12-file, generate default p12 filename
+            // using the same naming convention as generate_file_names()
+            let mut default_name = cli.domains[0].replace(':', "_").replace('*', "_wildcard");
+            if cli.domains.len() > 1 {
+                default_name.push_str(&format!("+{}", cli.domains.len() - 1));
+            }
+            if cli.client {
+                default_name.push_str("-client");
+            }
+            builder = builder.pkcs12_file(format!("{}.p12", default_name));
         }
 
         builder.build()?;
