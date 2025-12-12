@@ -49,7 +49,7 @@ fn test_ca_load_or_create() {
     let mut ca = fastcert::ca::CertificateAuthority::new(temp_dir.path().to_path_buf());
 
     // First call creates CA
-    let result = ca.load_or_create();
+    let result = ca.init_ca();
     assert!(result.is_ok(), "Should create CA successfully");
 
     // Verify CA files were created
@@ -60,7 +60,7 @@ fn test_ca_load_or_create() {
 
     // Second call should load existing CA
     let mut ca2 = fastcert::ca::CertificateAuthority::new(temp_dir.path().to_path_buf());
-    let result = ca2.load_or_create();
+    let result = ca2.init_ca();
     assert!(result.is_ok(), "Should load existing CA");
 
     unsafe {
@@ -107,7 +107,7 @@ fn test_ca_directory_creation() {
     }
 
     let mut ca = fastcert::ca::CertificateAuthority::new(ca_dir.clone());
-    let result = ca.load_or_create();
+    let result = ca.init_ca();
     assert!(
         result.is_ok(),
         "Should create directory if it doesn't exist"
@@ -174,7 +174,7 @@ fn test_ca_permissions() {
     }
 
     let mut ca = fastcert::ca::CertificateAuthority::new(temp_dir.path().to_path_buf());
-    ca.load_or_create().unwrap();
+    ca.init_ca().unwrap();
 
     let ca_key = ca.key_path();
 
@@ -207,14 +207,14 @@ fn test_multiple_ca_roots() {
         env::set_var("CAROOT", temp_dir1.path().to_str().unwrap());
     }
     let mut ca1 = fastcert::ca::CertificateAuthority::new(temp_dir1.path().to_path_buf());
-    ca1.load_or_create().unwrap();
+    ca1.init_ca().unwrap();
 
     // Create second CA
     unsafe {
         env::set_var("CAROOT", temp_dir2.path().to_str().unwrap());
     }
     let mut ca2 = fastcert::ca::CertificateAuthority::new(temp_dir2.path().to_path_buf());
-    ca2.load_or_create().unwrap();
+    ca2.init_ca().unwrap();
 
     // Verify both exist
     assert!(temp_dir1.path().join("rootCA.pem").exists());

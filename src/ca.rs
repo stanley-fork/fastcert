@@ -17,6 +17,30 @@ use std::os::unix::fs::PermissionsExt;
 const ROOT_CERT_FILE: &str = "rootCA.pem";
 const ROOT_KEY_FILE: &str = "rootCA-key.pem";
 
+/// Certificate Authority for generating and managing locally-trusted certificates
+///
+/// The CA is the central object for all certificate operations. Create or load
+/// a CA, optionally install it to system trust stores, then issue certificates.
+///
+/// # Example
+///
+/// ```no_run
+/// use fastcert::CA;
+///
+/// // Load or create CA in default location
+/// let ca = CA::load_or_create()?;
+///
+/// // Install to system trust stores
+/// ca.install()?;
+///
+/// // Issue a certificate
+/// ca.issue_certificate()
+///     .domains(vec!["localhost".to_string()])
+///     .build()?;
+/// # Ok::<(), fastcert::Error>(())
+/// ```
+pub type CA = CertificateAuthority;
+
 /// Get the CAROOT directory path as a string.
 ///
 /// Returns the directory where the CA certificate and key are stored.
@@ -106,9 +130,7 @@ fn get_caroot_path() -> Result<PathBuf> {
 /// - The CA certificate cannot be generated or loaded
 /// - System trust store installation fails (may require elevated privileges)
 pub fn install() -> Result<()> {
-    let caroot = get_caroot_path()?;
-    let mut ca = CertificateAuthority::new(caroot);
-    ca.load_or_create()?;
+    let ca = CA::load_or_create()?;
 
     #[cfg(target_os = "macos")]
     {
@@ -154,7 +176,7 @@ pub fn install() -> Result<()> {
 /// - System trust store uninstallation fails (may require elevated privileges)
 pub fn uninstall() -> Result<()> {
     let caroot = get_caroot_path()?;
-    let ca = CertificateAuthority::new(caroot);
+    let ca = CA::new(caroot);
 
     if !ca.cert_exists() {
         println!("No CA certificate found to uninstall.");
@@ -237,6 +259,64 @@ impl CertificateAuthority {
             cert_pem: None,
             key_pem: None,
         }
+    }
+
+    /// Load existing CA or create new one in default location
+    ///
+    /// This is a convenience method that combines `new()` and initialization.
+    /// The CA location is determined by the `CAROOT` environment variable, or
+    /// platform-specific defaults if not set.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use fastcert::CA;
+    ///
+    /// let ca = CA::load_or_create()?;
+    /// # Ok::<(), fastcert::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The CAROOT directory cannot be determined
+    /// - CA creation or loading fails
+    pub fn load_or_create() -> Result<Self> {
+        let caroot = get_caroot_path()?;
+        let mut ca = Self::new(caroot);
+        ca.init_ca()?;
+        Ok(ca)
+    }
+
+    /// Initialize the CA by loading existing or creating new certificate
+    ///
+    /// This method:
+    /// 1. Creates the CA directory if needed
+    /// 2. Loads the existing CA certificate if present
+    /// 3. Generates and saves a new CA if no certificate exists
+    ///
+    /// # Returns
+    ///
+    /// `Ok(&mut self)` on success for method chaining.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Directory creation fails
+    /// - CA generation fails
+    /// - File operations fail
+    pub fn init_ca(&mut self) -> Result<&mut Self> {
+        self.init()?;
+
+        if self.cert_exists() {
+            self.load()?;
+        } else {
+            self.create_ca()?;
+            self.save()?;
+            println!("{}", "Created a new local CA".green().bold());
+        }
+
+        Ok(self)
     }
 
     /// Get the root path of this CA.
@@ -438,37 +518,6 @@ impl CertificateAuthority {
 
         self.cert_pem = Some(cert_pem);
         self.key_pem = Some(key_pem);
-
-        Ok(())
-    }
-
-    /// Load existing CA or create a new one if it doesn't exist.
-    ///
-    /// This is the primary method for initializing a CA. It will:
-    /// 1. Create the CA directory if needed
-    /// 2. Load the existing CA certificate if present
-    /// 3. Generate and save a new CA if no certificate exists
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` on success, or an error if operations fail.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - Directory creation fails
-    /// - CA generation fails
-    /// - File operations fail
-    pub fn load_or_create(&mut self) -> Result<()> {
-        self.init()?;
-
-        if self.cert_exists() {
-            self.load()?;
-        } else {
-            self.create_ca()?;
-            self.save()?;
-            println!("{}", "Created a new local CA".green().bold());
-        }
 
         Ok(())
     }
@@ -699,13 +748,13 @@ mod tests {
         let mut ca = CertificateAuthority::new(temp_dir.clone());
 
         // First call creates CA
-        ca.load_or_create().unwrap();
+        ca.init_ca().unwrap();
         assert!(ca.cert_exists());
         assert!(ca.key_exists());
 
         // Second call loads existing CA
         let mut ca2 = CertificateAuthority::new(temp_dir.clone());
-        ca2.load_or_create().unwrap();
+        ca2.init_ca().unwrap();
 
         // Cleanup
         fs::remove_dir_all(temp_dir).unwrap();
@@ -721,7 +770,7 @@ mod tests {
         }
 
         let mut ca = CertificateAuthority::new(temp_dir.path().to_path_buf());
-        ca.load_or_create().unwrap();
+        ca.init_ca().unwrap();
 
         assert!(ca.cert_exists(), "CA certificate should be created");
         assert!(ca.key_exists(), "CA key should be created");
@@ -743,7 +792,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let mut ca = CertificateAuthority::new(temp_dir.path().to_path_buf());
-        ca.load_or_create().unwrap();
+        ca.init_ca().unwrap();
 
         assert!(
             ca.cert_exists(),
@@ -764,7 +813,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let mut ca = CertificateAuthority::new(temp_dir.path().to_path_buf());
-        ca.load_or_create().unwrap();
+        ca.init_ca().unwrap();
 
         let serial = ca.get_serial_number().unwrap();
         assert!(!serial.is_empty(), "Serial number should not be empty");
@@ -775,7 +824,7 @@ mod tests {
         // Create a different CA to verify uniqueness
         let temp_dir2 = TempDir::new().unwrap();
         let mut ca2 = CertificateAuthority::new(temp_dir2.path().to_path_buf());
-        ca2.load_or_create().unwrap();
+        ca2.init_ca().unwrap();
 
         let serial2 = ca2.get_serial_number().unwrap();
         assert_ne!(

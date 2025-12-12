@@ -844,9 +844,7 @@ pub fn generate_certificate(
     pkcs12: bool,
 ) -> Result<()> {
     // Load CA
-    let caroot = crate::ca::get_caroot()?;
-    let mut ca = crate::ca::CertificateAuthority::new(PathBuf::from(caroot));
-    ca.load_or_create()?;
+    let ca = crate::ca::CA::load_or_create()?;
 
     // Get CA certificate and key PEMs
     let ca_cert_pem = std::fs::read_to_string(ca.cert_path())?;
@@ -982,9 +980,7 @@ pub fn generate_from_csr(csr_path: &str, cert_file: Option<&str>) -> Result<()> 
     use x509_parser::prelude::*;
 
     // Load CA
-    let caroot = crate::ca::get_caroot()?;
-    let mut ca = crate::ca::CertificateAuthority::new(PathBuf::from(caroot));
-    ca.load_or_create()?;
+    let ca = crate::ca::CA::load_or_create()?;
 
     // Check if CA key exists
     if !ca.key_exists() {
